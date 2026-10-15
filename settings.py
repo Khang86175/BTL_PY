@@ -40,6 +40,9 @@ DIFFICULTY_MAX = {"easy": 2, "medium": 3, "hard": 3}
 # Ví dụ xóa 4 hàng (Tetris) ở speed 2 được 800*2 = 1600 điểm.
 LINE_SCORES = {1: 100, 2: 300, 3: 500, 4: 800}
 
+# File lưu điểm cao nhất, để thoát game mở lại vẫn còn.
+HIGHSCORE_FILE = "highscore.txt"
+
 # Bảng màu (R, G, B). BLACK nghĩa là ô trống, GRID_LINE là viền lưới.
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)

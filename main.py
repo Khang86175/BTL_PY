@@ -1,6 +1,6 @@
 """main.py: vòng lặp game chính (chế độ 1P).
-Phím P1: A/D trái-phải, giữ S rơi nhanh, W xoay, Space rơi ngay.
-P pause, R chơi lại khi thua.
+Phím P1: A/D trái-phải (giữ để đi liên tục), giữ S rơi nhanh,
+W xoay, Space rơi ngay. P pause, R chơi lại khi thua.
 """
 import pygame
 import settings
@@ -10,7 +10,7 @@ from game import Board
 pygame.init()
 # Tạo cửa sổ với kích thước lấy từ settings (board + panel).
 screen = pygame.display.set_mode((settings.WIDTH, settings.HEIGHT))
-pygame.display.set_caption("Tetris 1P - Day 1")
+pygame.display.set_caption("Tetris 1P - Day 2")
 # clock để giới hạn FPS + tính dt (thời gian mỗi frame).
 clock = pygame.time.Clock()
 # 2 cỡ chữ: font lớn cho next/score, small_font cho hướng dẫn.
@@ -109,7 +109,15 @@ while running:
     if paused and not board.game_over:
         screen.blit(font.render("PAUSE - P", True, settings.WHITE), (80, 280))
     if board.game_over:
-        screen.blit(font.render("GAME OVER - R", True, settings.WHITE), (40, 280))
+        # Màn hình thua: làm mờ board rồi hiện điểm ván này + kỷ lục.
+        shade = pygame.Surface((settings.COLS * settings.CELL, settings.HEIGHT))
+        shade.set_alpha(180)
+        shade.fill(settings.BLACK)
+        screen.blit(shade, (0, 0))
+        screen.blit(font.render("GAME OVER", True, settings.WHITE), (55, 220))
+        screen.blit(small_font.render(f"Score: {board.score}", True, settings.WHITE), (90, 260))
+        screen.blit(small_font.render(f"Best: {board.high}", True, settings.WHITE), (90, 285))
+        screen.blit(small_font.render("Nhan R choi lai", True, settings.WHITE), (60, 310))
 
     pygame.display.flip()  # đẩy khung hình mới lên màn hình
 

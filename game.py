@@ -8,6 +8,24 @@ from pieces import Piece, SharedSequence
 SPEED_MAP = {1: settings.SPEED_1, 2: settings.SPEED_2, 3: settings.SPEED_3}
 
 
+def load_highscore():
+    # Đọc điểm cao từ file. File chưa có hoặc nội dung hỏng thì coi như 0.
+    try:
+        with open(settings.HIGHSCORE_FILE, "r", encoding="utf-8") as f:
+            return max(0, int(f.read().strip() or 0))
+    except (OSError, ValueError):
+        return 0
+
+
+def save_highscore(value):
+    # Ghi điểm cao ra file. Lỗi ghi (ví dụ thư mục chỉ đọc) thì bỏ qua.
+    try:
+        with open(settings.HIGHSCORE_FILE, "w", encoding="utf-8") as f:
+            f.write(str(int(value)))
+    except OSError:
+        pass
+
+
 class Board:
     def __init__(self, difficulty="easy", shared=None):
         # difficulty: "easy" | "medium" | "hard", quyết định tốc độ ban đầu.
@@ -15,6 +33,8 @@ class Board:
         # (chơi 1 mình) thì board tự tạo túi riêng.
         self.difficulty = difficulty
         self.shared = shared or SharedSequence()
+        # Điểm cao đọc 1 lần khi tạo board, giữ lại qua nhiều ván (reset không xóa).
+        self.high = load_highscore()
         self.reset()
 
     def reset(self):
@@ -45,6 +65,10 @@ class Board:
         # Nếu vừa spawn đã đè lên gạch cũ -> hết chỗ -> thua.
         if not self.valid(self.current.shape, self.current.x, self.current.y):
             self.game_over = True
+            # Chốt điểm cao khi ván kết thúc rồi mới lưu file.
+            if self.score > self.high:
+                self.high = self.score
+                save_highscore(self.high)
 
     def valid(self, shape, px, py):
         # Kiểm tra ma trận shape đặt ở (px, py) có hợp lệ không.
@@ -83,6 +107,10 @@ class Board:
         # Cộng điểm theo bảng LINE_SCORES, nhân với speed (chơi nhanh thưởng nhiều).
         self.score += settings.LINE_SCORES.get(n, 0) * self.speed_level
         self.lines += n
+        # Vượt kỷ lục giữa ván thì cập nhật luôn để panel hiện kịp thời.
+        if self.score > self.high:
+            self.high = self.score
+            save_highscore(self.high)
         self.maybe_speed_up()
 
     def maybe_speed_up(self):
@@ -167,11 +195,15 @@ class Board:
         screen.blit(font.render("next", True, settings.WHITE), (nx + 45, 2))
         pygame.draw.rect(screen, settings.WHITE, (nx, ny, nw, nh), 2)
         self._draw_next_preview(screen, nx, ny, nw, nh)
-        # Điểm SCORE và tốc độ hiện tại nằm dưới khung next.
+        # Điểm SCORE, số hàng LINES, kỷ lục HI và tốc độ hiện tại dưới khung next.
         screen.blit(font.render("SCORE", True, settings.WHITE), (nx + 25, ny + nh + 30))
         screen.blit(font.render(str(self.score), True, settings.WHITE), (nx + 25, ny + nh + 60))
-        screen.blit(small_font.render(f"Speed {self.speed_level}", True, settings.WHITE),
+        screen.blit(small_font.render(f"LINES {self.lines}", True, settings.WHITE),
                     (nx + 25, ny + nh + 100))
+        screen.blit(small_font.render(f"HI {self.high}", True, settings.WHITE),
+                    (nx + 25, ny + nh + 125))
+        screen.blit(small_font.render(f"Speed {self.speed_level}", True, settings.WHITE),
+                    (nx + 25, ny + nh + 150))
 
     def _draw_next_preview(self, screen, nx, ny, nw, nh):
         # Vẽ khối kế tiếp vào giữa khung next, tự co cỡ ô (s) cho vừa khung.

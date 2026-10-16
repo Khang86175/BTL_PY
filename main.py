@@ -13,7 +13,7 @@ from menu import Menu
 pygame.init()
 # Cua so voi kich thuoc lay tu settings (board + panel).
 screen = pygame.display.set_mode((settings.WIDTH, settings.HEIGHT))
-pygame.display.set_caption("Tetris - Day 3: Menu + Do kho")
+pygame.display.set_caption("Tetris 1P")
 # clock de gioi han FPS + tinh dt (thoi gian moi frame).
 clock = pygame.time.Clock()
 # 2 co chu: font lon cho tieu de/diem, small_font cho huong dan.

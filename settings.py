@@ -28,6 +28,12 @@ SOFT_DROP_SPEED = 0.05
 MOVE_DAS = 0.18
 MOVE_INTERVAL = 0.06
 
+# Lock delay: khối chạm đáy thì đợi LOCK_DELAY giây mới khóa (thay vì dính ngay),
+# để người chơi kịp trượt/xoay cứu vào phút chót. Mỗi lần đi/xoay thành công
+# khi đang chạm đáy được gia hạn giờ, tối đa LOCK_MAX_RESETS lần.
+LOCK_DELAY = 0.5
+LOCK_MAX_RESETS = 15
+
 # Ngưỡng điểm để lên tốc: Dễ 1->2, Trung bình 2->3 (xem DIFFICULTY_MAX).
 SCORE_TO_SPEEDUP = 1500
 

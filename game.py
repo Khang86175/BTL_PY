@@ -47,6 +47,8 @@ class Board:
         self.speed_level = settings.DIFFICULTY_START[self.difficulty]
         self.max_speed = settings.DIFFICULTY_MAX[self.difficulty]
         self.fall_timer = 0.0  # đồng hồ đếm giờ rơi, cộng dồn dt mỗi frame
+        self.lock_timer = 0.0  # đồng hồ đếm giờ khóa khi khối đang chạm đáy
+        self.lock_resets = 0  # số lần đã gia hạn lock delay (tối đa LOCK_MAX_RESETS)
         self.game_over = False
         # spawn_count đếm đã ra bao nhiêu khối, dùng để hỏi SharedSequence.
         self.spawn_count = 0
@@ -58,10 +60,14 @@ class Board:
         # Lấy loại khối thứ spawn_count trong chuỗi chung rồi tạo Piece.
         kind = self.shared.kind_at(self.spawn_count)
         self.current = Piece(kind)
+        # Căn giữa board theo bề rộng khối (I 4 ô -> x=3, O 2 ô -> x=4).
+        self.current.x = (settings.COLS - len(self.current.shape[0])) // 2
         self.spawn_count += 1
         # Xem trước khối kế tiếp để vẽ ở khung "next".
         self.next_kind = self.shared.kind_at(self.spawn_count)
         self.fall_timer = 0.0
+        self.lock_timer = 0.0
+        self.lock_resets = 0
         # Nếu vừa spawn đã đè lên gạch cũ -> hết chỗ -> thua.
         if not self.valid(self.current.shape, self.current.x, self.current.y):
             self.game_over = True
@@ -118,25 +124,38 @@ class Board:
         if self.score >= settings.SCORE_TO_SPEEDUP and self.speed_level < self.max_speed:
             self.speed_level += 1
 
+    def _grounded(self):
+        # True khi khối đang chạm đáy hoặc chạm nóc đống gạch (không xuống được nữa).
+        return not self.valid(self.current.shape, self.current.x, self.current.y + 1)
+
+    def _bump_lock_delay(self):
+        # Gia hạn giờ khóa sau 1 lần đi/xoay thành công khi đang chạm đáy.
+        # Hết lượt gia hạn thì thôi, tránh câu giờ vô hạn.
+        if self._grounded() and self.lock_resets < settings.LOCK_MAX_RESETS:
+            self.lock_timer = 0.0
+            self.lock_resets += 1
+
     # ---- điều khiển ----
     def try_move(self, dx):
         # Dịch ngang dx (-1 trái, +1 phải) nếu vị trí mới hợp lệ.
         if not self.game_over and self.valid(self.current.shape,
                                              self.current.x + dx, self.current.y):
             self.current.x += dx
+            self._bump_lock_delay()
             return True
         return False
 
     def try_rotate(self):
-        # Xoay khối, có wall-kick đơn giản: xoay xong thử giữ nguyên,
-        # dịch trái 1, dịch phải 1, cái nào hợp lệ thì lấy.
+        # Xoay khối, có wall-kick: xoay xong thử giữ nguyên, dịch ±1, ±2,
+        # cái nào hợp lệ thì lấy (±2 để cứu thanh I kẹt sát tường).
         if self.game_over:
             return False
         rotated = self.current.rotate()
-        for dx in (0, -1, 1):
+        for dx in (0, -1, 1, -2, 2):
             if self.valid(rotated, self.current.x + dx, self.current.y):
                 self.current.shape = rotated
                 self.current.x += dx
+                self._bump_lock_delay()
                 return True
         return False
 
@@ -153,21 +172,36 @@ class Board:
 
     def update(self, dt, soft_drop_held=False):
         # Gọi mỗi frame. dt là thời gian từ frame trước (giây).
-        # Giữ phím rơi nhanh (S / Down) thì dùng SOFT_DROP_SPEED,
-        # thả ra thì dùng tốc độ thường theo speed_level.
         if self.game_over:
             return
-        self.fall_timer += dt
-        interval = settings.SOFT_DROP_SPEED if soft_drop_held else SPEED_MAP[self.speed_level]
-        if self.fall_timer >= interval:
+        if self._grounded():
+            # Đang chạm đáy: đếm giờ khóa thay vì rơi. Giữ S (soft-drop)
+            # thì khóa ngay cho nhanh, khỏi chờ hết LOCK_DELAY.
+            # Không tích fall_timer ở đây để nhả phím ra không bị rơi bù.
             self.fall_timer = 0.0
-            # Xuống được thì xuống 1 ô, kẹt đáy thì khóa + ra khối mới.
-            if self.valid(self.current.shape, self.current.x, self.current.y + 1):
-                self.current.y += 1
-            else:
+            if soft_drop_held:
                 self.lock()
                 if not self.game_over:
                     self._spawn()
+                return
+            self.lock_timer += dt
+            if self.lock_timer >= settings.LOCK_DELAY:
+                self.lock()
+                if not self.game_over:
+                    self._spawn()
+            return
+        # Đang lơ lửng: reset đồng hồ khóa, rơi theo tốc độ.
+        # Giữ phím rơi nhanh (S) thì dùng SOFT_DROP_SPEED,
+        # thả ra thì dùng tốc độ thường theo speed_level.
+        self.lock_timer = 0.0
+        self.lock_resets = 0
+        self.fall_timer += dt
+        interval = settings.SOFT_DROP_SPEED if soft_drop_held else SPEED_MAP[self.speed_level]
+        if self.fall_timer >= interval:
+            # Trừ interval (giữ phần dư) thay vì gán 0 để tốc độ rơi chuẩn,
+            # không bị chậm dần khi FPS trồi sụt.
+            self.fall_timer -= interval
+            self.current.y += 1
 
     # ---- vẽ: board ở origin_x, panel Next/Score bên phải ----
     def draw(self, screen, origin_x, font, small_font):

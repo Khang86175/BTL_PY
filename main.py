@@ -131,16 +131,24 @@ def draw_board(b, origin_x, label, show_help=False):
 
 
 def draw_2p_overlay():
-    # Phu ket qua khi 1 trong 2 ben thua: lam mo ca 2 board roi hien
-    # ai thang, diem 2 ben, va nhac R de choi van moi.
+    # Phu ket qua khi CA 2 ben deu thua: lam mo ca 2 board roi hien
+    # ket qua (P1 thang / P2 thang / hoa) + diem 2 ben + nhac R choi lai.
     shade = pygame.Surface((settings.WIDTH_2P, settings.HEIGHT))
     shade.set_alpha(180)
     shade.fill(settings.BLACK)
     screen.blit(shade, (0, 0))
     cx = settings.WIDTH_2P // 2
-    # boards_2p[0] thua -> P2 thang, va nguoc lai.
-    winner = "P2" if boards_2p[0].game_over else "P1"
-    t1 = font.render(winner + " THANG!", True, settings.WHITE)
+    go1, go2 = boards_2p[0].game_over, boards_2p[1].game_over
+    if go1 and go2:
+        # Hiem khi xay ra (ca 2 cung day cung luc) - hien HOA.
+        title = "HOA!"
+    elif go2:
+        title = "P1 THANG!"
+    elif go1:
+        title = "P2 THANG!"
+    else:
+        title = "KET THUC"
+    t1 = font.render(title, True, settings.WHITE)
     screen.blit(t1, (cx - t1.get_width() // 2, 200))
     s1 = small_font.render(f"P1: {boards_2p[0].score} diem", True, settings.WHITE)
     s2 = small_font.render(f"P2: {boards_2p[1].score} diem", True, settings.WHITE)
@@ -199,8 +207,9 @@ while running:
                     elif event.key == pygame.K_SPACE:
                         board.hard_drop()
             elif state == "playing_2p":
-                # Ket thuc: 1 ben game over thi dung ca 2 (hien ket qua).
-                match_over = any(b.game_over for b in boards_2p)
+                # Tran chi ket thuc khi CA 2 ben deu thua. Ben nao con
+                # choi duoc thi tiep tuc roi den khi het cho.
+                match_over = all(b.game_over for b in boards_2p)
                 if event.key == pygame.K_ESCAPE:
                     pygame.display.set_mode((settings.WIDTH, settings.HEIGHT))
                     menu.reset()
@@ -218,8 +227,11 @@ while running:
                 elif not paused and not match_over:
                     # Xoay / roi ngay theo bo phim rieng tung nguoi choi.
                     # A/D cua P1 (va mui ten trai/phai cua P2) xu ly o phan
-                    # giu phim ben duoi de di duoc lien tuc.
+                    # giu phim ben duoi de di duoc lien tuc. Ben nao da thua
+                    # thi bo qua phim cua ben do.
                     for i, b in enumerate(boards_2p):
+                        if b.game_over:
+                            continue
                         ks = P2P_KEYS[i]
                         if event.key == ks["rotate"]:
                             b.try_rotate()
@@ -233,10 +245,13 @@ while running:
             move_hold(board, keys, P2P_KEYS[0], hold_timers[0], dt)
             # Giu S thi soft_drop_held=True -> roi sieu nhanh.
             board.update(dt, soft_drop_held=keys[P2P_KEYS[0]["soft"]])
-    elif state == "playing_2p" and not paused and not any(b.game_over for b in boards_2p):
+    elif state == "playing_2p" and not paused and not all(b.game_over for b in boards_2p):
         # Moi ben co bo phim + dong ho + soft-drop rieng, nhung cung dt
-        # nen toc do roi giong nhau.
+        # nen toc do roi giong nhau. Ben nao da thua thi khong update nua,
+        # ben con lai choi tiep.
         for i, b in enumerate(boards_2p):
+            if b.game_over:
+                continue
             move_hold(b, keys, P2P_KEYS[i], hold_timers[i], dt)
             b.update(dt, soft_drop_held=keys[P2P_KEYS[i]["soft"]])
 
@@ -265,8 +280,8 @@ while running:
         pygame.draw.line(screen, settings.GRID_LINE, (split, 0), (split, settings.HEIGHT), 2)
         draw_board(boards_2p[0], 0, "P1")
         draw_board(boards_2p[1], split, "P2")
-        if any(b.game_over for b in boards_2p):
-            draw_2p_overlay()  # 1 ben thua -> hien ket qua + nhac R
+        if all(b.game_over for b in boards_2p):
+            draw_2p_overlay()  # ca 2 ben deu thua -> hien ket qua + nhac R
         elif paused:
             screen.blit(font.render("PAUSE - P", True, settings.WHITE),
                         (settings.WIDTH_2P // 2 - 70, 280))

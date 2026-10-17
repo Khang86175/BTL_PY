@@ -69,24 +69,46 @@ def new_piece():
 class SharedSequence:
     """Chuỗi khối dùng chung cho 2 người chơi để đảm bảo công bằng.
 
-    Cách dùng: cả 2 Board cùng trỏ tới 1 SharedSequence. Mỗi board đếm
-    số khối mình đã spawn (spawn_count) rồi hỏi kind_at(spawn_count).
-    Vì cùng đọc 1 list nên thứ tự khối giống hệt nhau, dù 2 bên
-    chơi nhanh/chậm khác nhau. Bên trong dùng kiểu 7-bag: xáo từng
-    túi đủ 7 loại khối rồi mới xáo túi tiếp theo (không bị ra 1 loại
-    liên tục như random thuần).
+    Cả 2 Board cùng trỏ tới 1 SharedSequence. Board thứ i spawn khối thứ k
+    của mình bằng cách đọc khối ở vị trí (base + k) trong chuỗi. Vì cùng
+    đọc 1 seq nên thứ tự khối giống hệt nhau dù 2 bên chơi nhanh/chậm
+    khác nhau. Bên trong dùng kiểu 7-bag: xáo từng túi đủ 7 loại khối rồi
+    mới xáo túi tiếp theo (không bị ra 1 loại liên tục như random thuần).
     """
 
     def __init__(self, seed=None):
-        # rng riêng để có thể fix seed khi test (seed giống -> chuỗi giống).
-        self.rng = random.Random(seed)
-        # seq là list kết quả đã xáo, dài dần theo thời gian.
+        # Seed gốc: dùng để sinh seed riêng cho từng túi (bag).
+        # Seed None (chơi thật) thì lấy ngẫu nhiên, để mỗi ván khác nhau.
+        self.seed = random.randrange(1 << 30) if seed is None else seed
+        # seq: các túi đã xáo, dài dần theo thời gian.
         self.seq = []
+        # cursor: đánh dấu mốc "đã cấp phát tới đâu" của chuỗi, CHỈ TIẾN.
+        # Board bắt đầu ván mới sẽ lấy mốc base = cursor hiện tại, nên
+        # khối của ván trước không bị dùng lại.
+        self.cursor = 0
+
+    def _ensure(self, i):
+        # Đảm bảo seq đã có ít nhất i+1 phần tử (xáo thêm túi nếu thiếu).
+        while len(self.seq) <= i:
+            self._fill_bag(len(self.seq) // 7)
+
+    def _fill_bag(self, bag_index):
+        # Sinh 1 túi 7 khối mới. Dùng rng tạo từ (seed gốc, số túi) nên
+        # túi thứ k luôn giống nhau dù bên nào gọi trước.
+        rng = random.Random(f"{self.seed}:{bag_index}")
+        bag = list(SHAPES.keys())
+        rng.shuffle(bag)
+        self.seq.extend(bag)
 
     def kind_at(self, i):
-        # Đảm bảo list đủ dài tới vị trí i, thiếu thì xáo thêm túi mới.
-        while len(self.seq) <= i:
-            bag = list(SHAPES.keys())
-            self.rng.shuffle(bag)
-            self.seq.extend(bag)
+        # Xem khối ở vị trí i mà KHÔNG tiêu thụ nó (dùng để xem trước).
+        self._ensure(i)
+        return self.seq[i]
+
+    def consume_to(self, i):
+        # Tiêu thụ khối ở vị trí i: đảm bảo đã xáo tới đó rồi đẩy con trỏ
+        # chung lên i+1 (nếu con trỏ đang thấp hơn). Trả về khối đó.
+        self._ensure(i)
+        if self.cursor <= i:
+            self.cursor = i + 1
         return self.seq[i]

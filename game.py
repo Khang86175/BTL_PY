@@ -1,5 +1,6 @@
 """game.py: class Board chứa toàn bộ logic của 1 bảng Tetris 10x20.
-Mỗi người chơi có 1 Board riêng. Chế độ 2P chỉ là tạo 2 Board."""
+Mỗi người chơi có 1 Board riêng. Chế độ 2P tạo 2 Board cùng đọc
+1 SharedSequence (chuỗi khối chung) nên 2 bên luôn nhận khối giống nhau."""
 import pygame
 import settings
 from pieces import Piece, SharedSequence
@@ -30,11 +31,16 @@ class Board:
     def __init__(self, difficulty="easy", shared=None):
         # difficulty: "easy" | "medium" | "hard", quyết định tốc độ ban đầu.
         # shared: SharedSequence dùng chung của 2 board (2P). Nếu là None
-        # (chơi 1 mình) thì board tự tạo túi riêng.
+        # (chơi 1 mình) thì board tự tạo chuỗi riêng.
         self.difficulty = difficulty
         self.shared = shared or SharedSequence()
         # Điểm cao đọc 1 lần khi tạo board, giữ lại qua nhiều ván (reset không xóa).
         self.high = load_highscore()
+        # piece_count: số khối board này đã spawn trong ván hiện tại.
+        # base_piece: mốc bắt đầu của ván hiện tại trong chuỗi chung.
+        # Khối spawn lần thứ k lấy tại vị trí (base_piece + k - 1).
+        self.piece_count = 0
+        self.base_piece = 0
         self.reset()
 
     def reset(self):
@@ -50,21 +56,26 @@ class Board:
         self.lock_timer = 0.0  # đồng hồ đếm giờ khóa khi khối đang chạm đáy
         self.lock_resets = 0  # số lần đã gia hạn lock delay (tối đa LOCK_MAX_RESETS)
         self.game_over = False
-        # spawn_count đếm đã ra bao nhiêu khối, dùng để hỏi SharedSequence.
-        self.spawn_count = 0
-        self.next_kind = self.shared.kind_at(self.spawn_count + 1)
+        # Ván mới: mốc bắt đầu LUÔN là 0 - board mới và board reset đều
+        # bắt đầu từ khối đầu tiên của chuỗi chung, nên 2 board của 2P
+        # chắc chắn khởi đầu giống hệt nhau dù tạo theo thứ tự nào.
+        self.piece_count = 0
+        self.base_piece = 0
         self._spawn()
 
     # ---- spawn / valid / lock ----
     def _spawn(self):
-        # Lấy loại khối thứ spawn_count trong chuỗi chung rồi tạo Piece.
-        kind = self.shared.kind_at(self.spawn_count)
+        # Lấy khối của mình: vị trí (base_piece + số khối đã spawn).
+        # consume_to đọc khối đó VÀ tiêu thụ nó (đẩy mốc chung lên), nên
+        # board kia sau này đọc cùng vị trí sẽ nhận đúng khối này.
+        pos = self.base_piece + self.piece_count
+        kind = self.shared.consume_to(pos)
         self.current = Piece(kind)
+        self.piece_count += 1
         # Căn giữa board theo bề rộng khối (I 4 ô -> x=3, O 2 ô -> x=4).
         self.current.x = (settings.COLS - len(self.current.shape[0])) // 2
-        self.spawn_count += 1
         # Xem trước khối kế tiếp để vẽ ở khung "next".
-        self.next_kind = self.shared.kind_at(self.spawn_count)
+        self.next_kind = self.shared.kind_at(self.base_piece + self.piece_count)
         self.fall_timer = 0.0
         self.lock_timer = 0.0
         self.lock_resets = 0

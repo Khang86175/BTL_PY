@@ -9,9 +9,13 @@ CELL = 30
 
 # SIDEBAR là panel bên phải chứa khung "next" và điểm (rộng 200px).
 SIDEBAR = 200
-# Kích thước cửa sổ = board + panel. main.py dùng 2 số này để tạo màn hình.
-WIDTH = COLS * CELL + SIDEBAR
+# Mỗi người chơi chiếm 1 "cột" = board + panel. Chế độ 2P dùng 2 cột.
+PLAYER_WIDTH = COLS * CELL + SIDEBAR
+# Kích thước cửa sổ 1P = 1 cột. main.py dùng 2 số này để tạo màn hình 1P.
+WIDTH = PLAYER_WIDTH
 HEIGHT = ROWS * CELL
+# Cửa sổ 2P rộng gấp đôi (2 board cạnh nhau).
+WIDTH_2P = PLAYER_WIDTH * 2
 # FPS: số khung hình mỗi giây, clock.tick(FPS) giữ game chạy mượt.
 FPS = 60
 
@@ -44,7 +48,7 @@ DIFFICULTY_MAX = {"easy": 2, "medium": 3, "hard": 3}
 
 # Điểm ăn theo số hàng xóa cùng lúc, rồi nhân với speed_level hiện tại.
 # Ví dụ xóa 4 hàng (Tetris) ở speed 2 được 800*2 = 1600 điểm.
-LINE_SCORES = {1: 100, 2: 300, 3: 500, 4: 800}
+LINE_SCORES = {1: 100, 2: 200, 3: 350, 4: 500}
 
 # File lưu điểm cao nhất, để thoát game mở lại vẫn còn.
 HIGHSCORE_FILE = "highscore.txt"

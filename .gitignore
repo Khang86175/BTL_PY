@@ -1,0 +1,6 @@
+# File Python sinh ra khi chay
+__pycache__/
+*.pyc
+
+# Du lieu choi sinh ra (diem cao), khong can day len repo
+highscore.txt

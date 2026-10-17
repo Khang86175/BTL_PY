@@ -132,26 +132,25 @@ def draw_board(b, origin_x, label, show_help=False):
 
 def draw_2p_overlay():
     # Phu ket qua khi CA 2 ben deu thua: lam mo ca 2 board roi hien
-    # ket qua (P1 thang / P2 thang / hoa) + diem 2 ben + nhac R choi lai.
+    # ket qua (ai diem cao hon thi thang, bang diem thi hoa) + diem
+    # 2 ben + nhac R choi lai.
     shade = pygame.Surface((settings.WIDTH_2P, settings.HEIGHT))
     shade.set_alpha(180)
     shade.fill(settings.BLACK)
     screen.blit(shade, (0, 0))
     cx = settings.WIDTH_2P // 2
-    go1, go2 = boards_2p[0].game_over, boards_2p[1].game_over
-    if go1 and go2:
-        # Hiem khi xay ra (ca 2 cung day cung luc) - hien HOA.
-        title = "HOA!"
-    elif go2:
+    # So sanh diem 2 ben khi da het tran.
+    score1, score2 = boards_2p[0].score, boards_2p[1].score
+    if score1 > score2:
         title = "P1 THANG!"
-    elif go1:
+    elif score2 > score1:
         title = "P2 THANG!"
     else:
-        title = "KET THUC"
+        title = "HOA!"
     t1 = font.render(title, True, settings.WHITE)
     screen.blit(t1, (cx - t1.get_width() // 2, 200))
-    s1 = small_font.render(f"P1: {boards_2p[0].score} diem", True, settings.WHITE)
-    s2 = small_font.render(f"P2: {boards_2p[1].score} diem", True, settings.WHITE)
+    s1 = small_font.render(f"P1: {score1} diem", True, settings.WHITE)
+    s2 = small_font.render(f"P2: {score2} diem", True, settings.WHITE)
     screen.blit(s1, (cx - s1.get_width() // 2, 250))
     screen.blit(s2, (cx - s2.get_width() // 2, 275))
     r1 = small_font.render("R: choi lai  |  ESC: ve menu", True, settings.WHITE)

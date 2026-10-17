@@ -5,12 +5,12 @@ import pygame
 import settings
 
 # Lua chon che do: chi so 0 = 1 nguoi, 1 = 2 nguoi.
-MODE_OPTIONS = ["1 Nguoi choi", "2 Nguoi choi"]
+MODE_OPTIONS = ["1 Người chơi", "2 Người chơi"]
 # Lua chon do kho: (key truyen cho Board, chu hien thi + toc do bat dau).
 DIFF_OPTIONS = [
-    ("easy", "De (Speed 1)"),
-    ("medium", "Trung binh (Speed 2)"),
-    ("hard", "Kho (Speed 3)"),
+    ("easy", "Dễ (Speed 1)"),
+    ("medium", "Trung bình (Speed 2)"),
+    ("hard", "Khó (Speed 3)"),
 ]
 
 
@@ -67,12 +67,12 @@ class Menu:
         title = font.render("TETRIS", True, settings.WHITE)
         screen.blit(title, (cx - title.get_width() // 2, 100))
         if self.stage == "mode":
-            sub = small_font.render("Chon che do choi", True, settings.WHITE)
+            sub = small_font.render("Chọn chế độ chơi", True, settings.WHITE)
             screen.blit(sub, (cx - sub.get_width() // 2, 150))
             options = MODE_OPTIONS
             index = self.mode_index
         else:
-            sub = small_font.render("Chon do kho", True, settings.WHITE)
+            sub = small_font.render("Chọn độ khó", True, settings.WHITE)
             screen.blit(sub, (cx - sub.get_width() // 2, 150))
             options = [label for _, label in DIFF_OPTIONS]
             index = self.diff_index
@@ -80,5 +80,7 @@ class Menu:
             prefix = "> " if i == index else "  "
             img = font.render(prefix + text, True, settings.WHITE)
             screen.blit(img, (cx - img.get_width() // 2, 220 + i * 50))
-        hint = small_font.render("W/S hoac Up/Down: chon | Space/Enter: OK | ESC: lui", True, settings.WHITE)
-        screen.blit(hint, (cx - hint.get_width() // 2, 500))
+        hint1 = small_font.render("W/S hoặc Up/Down: chọn", True, settings.WHITE)
+        hint2 = small_font.render("Space/Enter: OK | ESC: lùi", True, settings.WHITE)
+        screen.blit(hint1, (cx - hint1.get_width() // 2, 500))
+        screen.blit(hint2, (cx - hint2.get_width() // 2, 530))

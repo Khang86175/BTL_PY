@@ -8,17 +8,20 @@ Game 2P: P1 dung A/S/D/W/Space, P2 dung mui ten + Enter.
 giong het nhau. Ai het cho truoc (game over) thi thua, hien ket qua
 va cho R choi van moi.
 """
+
 import pygame
 import settings
+import os
 from game import Board
 from menu import Menu
 from pieces import SharedSequence
 
+os.environ['SDL_VIDEO_CENTERED'] = '1'
 # --- Khoi tao pygame: bat buoc truoc khi dung display/font ---
 pygame.init()
 # Cua so 1P (500x600). Che do 2P se doi kich thuoc cua so luc bat dau.
 screen = pygame.display.set_mode((settings.WIDTH, settings.HEIGHT))
-pygame.display.set_caption("Tetris 1P")
+pygame.display.set_caption("Tetris")
 clock = pygame.time.Clock()  # gioi han FPS + tinh dt (thoi gian moi frame)
 # 2 co chu: font lon cho tieu de/diem, small_font cho huong dan.
 font = pygame.font.SysFont("consolas", 24)
@@ -49,7 +52,10 @@ P2P_KEYS = [
 # [hold_left, repeat_left, hold_right, repeat_right] cho moi nguoi.
 hold_timers = [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
 
-
+def re_center_window():
+    """Gửi sự kiện thông báo cho hệ thống đặt lại vị trí cửa sổ vào giữa màn hình"""
+    os.environ['SDL_VIDEO_CENTERED'] = '1'
+    pygame.display.get_surface()
 def reset_hold_timers(idx=0):
     # Reset dong ho giu phim khi doi trang thai de khong bi troi phim.
     hold_timers[idx][:] = [0.0, 0.0, 0.0, 0.0]
@@ -112,6 +118,7 @@ def start_2p(difficulty):
     reset_hold_timers(0)
     reset_hold_timers(1)
     state = "playing_2p"
+    re_center_window()
 
 
 def draw_board(b, origin_x, label, show_help=False):
@@ -142,18 +149,18 @@ def draw_2p_overlay():
     # So sanh diem 2 ben khi da het tran.
     score1, score2 = boards_2p[0].score, boards_2p[1].score
     if score1 > score2:
-        title = "P1 THANG!"
+        title = "P1 THẮNG!"
     elif score2 > score1:
-        title = "P2 THANG!"
+        title = "P2 THẮNG!"
     else:
-        title = "HOA!"
+        title = "HOÀ!"
     t1 = font.render(title, True, settings.WHITE)
     screen.blit(t1, (cx - t1.get_width() // 2, 200))
-    s1 = small_font.render(f"P1: {score1} diem", True, settings.WHITE)
-    s2 = small_font.render(f"P2: {score2} diem", True, settings.WHITE)
+    s1 = small_font.render(f"P1: {score1} điểm", True, settings.WHITE)
+    s2 = small_font.render(f"P2: {score2} điểm", True, settings.WHITE)
     screen.blit(s1, (cx - s1.get_width() // 2, 250))
     screen.blit(s2, (cx - s2.get_width() // 2, 275))
-    r1 = small_font.render("R: choi lai  |  ESC: ve menu", True, settings.WHITE)
+    r1 = small_font.render("R: chơi lại  |  ESC: về menu", True, settings.WHITE)
     screen.blit(r1, (cx - r1.get_width() // 2, 320))
 
 
@@ -271,7 +278,7 @@ while running:
             screen.blit(font.render("GAME OVER", True, settings.WHITE), (55, 220))
             screen.blit(small_font.render(f"Score: {board.score}", True, settings.WHITE), (90, 260))
             screen.blit(small_font.render(f"Best: {board.high}", True, settings.WHITE), (90, 285))
-            screen.blit(small_font.render("Nhan R choi lai", True, settings.WHITE), (60, 310))
+            screen.blit(small_font.render("Nhấn R chơi lại", True, settings.WHITE), (60, 310))
     else:
         # Che do 2P: ve 2 board canh nhau, vach phan cach giua 2 nguoi choi.
         screen.fill(settings.BLACK)

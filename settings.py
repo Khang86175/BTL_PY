@@ -48,7 +48,7 @@ DIFFICULTY_MAX = {"easy": 2, "medium": 3, "hard": 3}
 
 # Điểm ăn theo số hàng xóa cùng lúc, rồi nhân với speed_level hiện tại.
 # Ví dụ xóa 4 hàng (Tetris) ở speed 2 được 800*2 = 1600 điểm.
-LINE_SCORES = {1: 100, 2: 300, 3: 500, 4: 800}
+LINE_SCORES = {1: 100, 2: 200, 3: 350, 4: 500}
 
 # File lưu điểm cao nhất, để thoát game mở lại vẫn còn.
 HIGHSCORE_FILE = "highscore.txt"

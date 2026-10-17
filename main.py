@@ -1,21 +1,23 @@
 """main.py: vong lap game chinh.
-Trang thai: MENU chon che do -> MENU chon do kho -> PLAYING (1P).
+Trang thai: MENU chon che do -> MENU chon do kho -> PLAYING (1P hoac 2P).
 Menu: W/S hoac Up/Down di chuyen, Space/Enter chon, ESC quay lui.
 Game 1P: A/D (giu de di lien tuc), giu S roi nhanh, W xoay,
 Space roi ngay. P pause, R choi lai khi thua, ESC ve menu.
+Game 2P (khung Ngay 5): 2 board doc chung 1 chuoi khoi nen roi y het nhau;
+dieu khien rieng tung nguoi se lam o Ngay 6.
 """
 import pygame
 import settings
 from game import Board
 from menu import Menu
+from pieces import SharedSequence
 
 # --- Khoi tao pygame: bat buoc truoc khi dung display/font ---
 pygame.init()
-# Cua so voi kich thuoc lay tu settings (board + panel).
+# Cua so 1P (500x600). Che do 2P se doi kich thuoc cua so luc bat dau.
 screen = pygame.display.set_mode((settings.WIDTH, settings.HEIGHT))
 pygame.display.set_caption("Tetris 1P")
-# clock de gioi han FPS + tinh dt (thoi gian moi frame).
-clock = pygame.time.Clock()
+clock = pygame.time.Clock()  # gioi han FPS + tinh dt (thoi gian moi frame)
 # 2 co chu: font lon cho tieu de/diem, small_font cho huong dan.
 font = pygame.font.SysFont("consolas", 24)
 small_font = pygame.font.SysFont("consolas", 18)
@@ -23,10 +25,14 @@ small_font = pygame.font.SysFont("consolas", 18)
 menu = Menu()
 # Board mac dinh, se tao lai dung do kho khi chon menu xong.
 board = Board(difficulty="easy")
-# state: "menu" (chon che do/do kho), "playing" (choi 1P),
-# "wip_2p" (man hinh cho che do 2P se lam o Ngay 5-6).
+# state: "menu" (chon che do/do kho), "playing" (dang choi 1P),
+# "playing_2p" (che do 2 nguoi).
 state = "menu"
 paused = False  # co tam dung, bat/tat bang phim P
+# boards_2p + shared de che do 2P dung: 2 board doc chung 1 chuoi khoi
+# nen thu tu khoi 2 ben giong het nhau (cong bang).
+boards_2p = []
+shared = None
 
 # Dong ho giu phim A/D de di lien tuc (kieu DAS cua Tetris).
 # hold_*: giu phim duoc bao lau; repeat_*: dem toi INTERVAL de di tiep 1 o.
@@ -48,10 +54,42 @@ def reset_hold_timers():
 def start_1p(difficulty):
     # Bat dau van 1P moi voi do kho da chon o menu.
     global board, state, paused
+    pygame.display.set_mode((settings.WIDTH, settings.HEIGHT))
+    pygame.display.set_caption("Tetris 1P")
     board = Board(difficulty=difficulty)
     paused = False
     reset_hold_timers()
     state = "playing"
+
+
+def start_2p(difficulty):
+    # Bat dau van 2P: cua so rong gap doi, 2 board doc chung 1 SharedSequence
+    # nen 2 ben nhan dung cung thu tu khoi (chinh la yeu cau cong bang).
+    global boards_2p, shared, state, paused
+    pygame.display.set_mode((settings.WIDTH_2P, settings.HEIGHT))
+    pygame.display.set_caption("Tetris 2P")
+    shared = SharedSequence()
+    boards_2p = [Board(difficulty=difficulty, shared=shared),
+                 Board(difficulty=difficulty, shared=shared)]
+    paused = False
+    reset_hold_timers()
+    state = "playing_2p"
+
+
+def draw_board(board, origin_x, label, show_help=False):
+    # Ve 1 board tai vi tri origin_x + nhan ten nguoi choi goc phai panel.
+    board.draw(screen, origin_x, font, small_font)
+    panel_x = origin_x + settings.COLS * settings.CELL
+    img = small_font.render(label, True, settings.WHITE)
+    screen.blit(img, (panel_x + settings.SIDEBAR - 10 - img.get_width(), 2))
+    if show_help:
+        # Dong huong dan phim o goc panel (chi hien khi 1P).
+        screen.blit(small_font.render("A/D move  S hold  W rot", True, settings.WHITE),
+                    (origin_x + 310, 400))
+        screen.blit(small_font.render("Space drop  P pause", True, settings.WHITE),
+                    (origin_x + 310, 425))
+        screen.blit(small_font.render("ESC menu", True, settings.WHITE),
+                    (origin_x + 310, 450))
 
 
 # --- Vong lap game: lap toi khi dong cua so ---
@@ -73,22 +111,17 @@ while running:
                     menu.move(1)
                 elif event.key in (pygame.K_SPACE, pygame.K_RETURN):
                     action, data = menu.confirm()
-                    if action == "need_2p":
-                        # Che do 2P se lam o Ngay 5-6, hien man hinh cho.
-                        state = "wip_2p"
-                    elif action == "start_1p":
+                    if action == "start_1p":
                         start_1p(data)
+                    elif action == "start_2p":
+                        start_2p(data)
                     # "goto_diff" thi menu tu chuyen stage, khong can lam gi.
                 elif event.key == pygame.K_ESCAPE:
                     menu.back()  # tu man hinh do kho lui ve man hinh che do
-            elif state == "wip_2p":
-                # Man hinh cho 2P: phim nao cung ve lai menu che do.
-                if event.key in (pygame.K_ESCAPE, pygame.K_SPACE, pygame.K_RETURN):
-                    menu.reset()
-                    state = "menu"
             elif state == "playing":
                 if event.key == pygame.K_ESCAPE:
                     # Ve menu de doi che do/do kho, dong ho giu phim reset theo.
+                    pygame.display.set_mode((settings.WIDTH, settings.HEIGHT))
                     menu.reset()
                     paused = False
                     reset_hold_timers()
@@ -107,6 +140,17 @@ while running:
                         board.try_rotate()
                     elif event.key == pygame.K_SPACE:
                         board.hard_drop()
+            elif state == "playing_2p":
+                # Ngay 5: chi la khung, 2 board roi y het nhau de kiem tra
+                # chuoi khoi chung. Phim rieng cho tung nguoi lam o Ngay 6.
+                if event.key == pygame.K_ESCAPE:
+                    pygame.display.set_mode((settings.WIDTH, settings.HEIGHT))
+                    menu.reset()
+                    paused = False
+                    reset_hold_timers()
+                    state = "menu"
+                elif event.key == pygame.K_p:
+                    paused = not paused
 
     # 2. Giua cac frame: A/D di lien tuc, S roi nhanh (khac KEYDOWN chi ban 1 lan).
     if state == "playing":
@@ -143,28 +187,19 @@ while running:
                 reset_hold_timers()
             # Giu S thi soft_drop_held=True -> roi sieu nhanh.
             board.update(dt, soft_drop_held=keys[pygame.K_s])
+    elif state == "playing_2p":
+        # Ca 2 board cung chay update voi cung dt -> toc do roi giong nhau,
+        # va vi doc chung chuoi khoi nen khoi dang roi cung giong nhau.
+        if not paused:
+            for b in boards_2p:
+                b.update(dt)
 
     # 3. Ve theo trang thai hien tai.
     if state == "menu":
         menu.draw(screen, font, small_font)
-    elif state == "wip_2p":
-        # Man hinh cho tam thoi, se thay bang game 2P that o Ngay 5-6.
+    elif state == "playing":
         screen.fill(settings.BLACK)
-        cx = settings.WIDTH // 2
-        t1 = font.render("Che do 2 nguoi choi", True, settings.WHITE)
-        t2 = small_font.render("dang phat trien (Ngay 5-6)", True, settings.WHITE)
-        t3 = small_font.render("Nhan ESC de quay lai", True, settings.WHITE)
-        screen.blit(t1, (cx - t1.get_width() // 2, 220))
-        screen.blit(t2, (cx - t2.get_width() // 2, 260))
-        screen.blit(t3, (cx - t3.get_width() // 2, 300))
-    else:
-        screen.fill(settings.BLACK)
-        board.draw(screen, 0, font, small_font)
-        # Dong huong dan phim o goc panel.
-        screen.blit(small_font.render("A/D move  S hold  W rot", True, settings.WHITE), (310, 400))
-        screen.blit(small_font.render("Space drop  P pause", True, settings.WHITE), (310, 425))
-        screen.blit(small_font.render("ESC menu", True, settings.WHITE), (310, 450))
-        # Chu phu khi pause hoac thua.
+        draw_board(board, 0, "P1", show_help=True)
         if paused and not board.game_over:
             screen.blit(font.render("PAUSE - P", True, settings.WHITE), (80, 280))
         if board.game_over:
@@ -177,6 +212,15 @@ while running:
             screen.blit(small_font.render(f"Score: {board.score}", True, settings.WHITE), (90, 260))
             screen.blit(small_font.render(f"Best: {board.high}", True, settings.WHITE), (90, 285))
             screen.blit(small_font.render("Nhan R choi lai", True, settings.WHITE), (60, 310))
+    else:
+        # Che do 2P: ve 2 board canh nhau, vach phan cach giua 2 nguoi choi.
+        screen.fill(settings.BLACK)
+        split = settings.PLAYER_WIDTH
+        pygame.draw.line(screen, settings.GRID_LINE, (split, 0), (split, settings.HEIGHT), 2)
+        draw_board(boards_2p[0], 0, "P1")
+        draw_board(boards_2p[1], split, "P2")
+        if paused:
+            screen.blit(font.render("PAUSE - P", True, settings.WHITE), (settings.WIDTH_2P // 2 - 70, 280))
 
     pygame.display.flip()  # day khung hinh moi len man hinh
 

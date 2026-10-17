@@ -3,8 +3,10 @@ Trang thai: MENU chon che do -> MENU chon do kho -> PLAYING (1P hoac 2P).
 Menu: W/S hoac Up/Down di chuyen, Space/Enter chon, ESC quay lui.
 Game 1P: A/D (giu de di lien tuc), giu S roi nhanh, W xoay,
 Space roi ngay. P pause, R choi lai khi thua, ESC ve menu.
-Game 2P (khung Ngay 5): 2 board doc chung 1 chuoi khoi nen roi y het nhau;
-dieu khien rieng tung nguoi se lam o Ngay 6.
+Game 2P: P1 dung A/S/D/W/Space, P2 dung mui ten + Enter.
+2 board doc chung 1 chuoi khoi (SharedSequence) nen khoi 2 ben
+giong het nhau. Ai het cho truoc (game over) thi thua, hien ket qua
+va cho R choi van moi.
 """
 import pygame
 import settings
@@ -33,22 +35,56 @@ paused = False  # co tam dung, bat/tat bang phim P
 # nen thu tu khoi 2 ben giong het nhau (cong bang).
 boards_2p = []
 shared = None
+# difficulty_2p: nho do kho da chon de R co the choi lai cung do kho.
+difficulty_2p = "easy"
 
-# Dong ho giu phim A/D de di lien tuc (kieu DAS cua Tetris).
-# hold_*: giu phim duoc bao lau; repeat_*: dem toi INTERVAL de di tiep 1 o.
-hold_a = 0.0
-repeat_a = 0.0
-hold_d = 0.0
-repeat_d = 0.0
+# Bo phim cua tung nguoi choi 2P: P1 = WASD + Space, P2 = mui ten + Enter.
+P2P_KEYS = [
+    {"left": pygame.K_a, "right": pygame.K_d, "rotate": pygame.K_w,
+     "soft": pygame.K_s, "hard": pygame.K_SPACE},
+    {"left": pygame.K_LEFT, "right": pygame.K_RIGHT, "rotate": pygame.K_UP,
+     "soft": pygame.K_DOWN, "hard": pygame.K_RETURN},
+]
+# Dong ho giu phim A/D cua tung nguoi choi (kieu DAS cua Tetris):
+# [hold_left, repeat_left, hold_right, repeat_right] cho moi nguoi.
+hold_timers = [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
 
 
-def reset_hold_timers():
+def reset_hold_timers(idx=0):
     # Reset dong ho giu phim khi doi trang thai de khong bi troi phim.
-    global hold_a, repeat_a, hold_d, repeat_d
-    hold_a = 0.0
-    repeat_a = 0.0
-    hold_d = 0.0
-    repeat_d = 0.0
+    hold_timers[idx][:] = [0.0, 0.0, 0.0, 0.0]
+
+
+def move_hold(b, keys, keyset, timers, dt):
+    # Giu A/D (hoac mui ten) di lien tuc kieu DAS: frame dau di ngay 1 o,
+    # giu qua MOVE_DAS thi cu moi MOVE_INTERVAL di them 1 o. Giu ca 2
+    # phim cung luc thi dung yen. timers = [hl, rl, hr, rr].
+    left = keys[keyset["left"]]
+    right = keys[keyset["right"]]
+    if left and not right:
+        if timers[0] == 0.0:
+            b.try_move(-1)  # moi nhan xuong thi di ngay, khong cho
+        timers[0] += dt
+        timers[2] = 0.0
+        timers[3] = 0.0
+        if timers[0] >= settings.MOVE_DAS:
+            timers[1] += dt
+            while timers[1] >= settings.MOVE_INTERVAL:
+                timers[1] -= settings.MOVE_INTERVAL
+                b.try_move(-1)
+    elif right and not left:
+        if timers[2] == 0.0:
+            b.try_move(1)
+        timers[2] += dt
+        timers[0] = 0.0
+        timers[1] = 0.0
+        if timers[2] >= settings.MOVE_DAS:
+            timers[3] += dt
+            while timers[3] >= settings.MOVE_INTERVAL:
+                timers[3] -= settings.MOVE_INTERVAL
+                b.try_move(1)
+    else:
+        timers[:] = [0.0, 0.0, 0.0, 0.0]
 
 
 def start_1p(difficulty):
@@ -58,27 +94,29 @@ def start_1p(difficulty):
     pygame.display.set_caption("Tetris 1P")
     board = Board(difficulty=difficulty)
     paused = False
-    reset_hold_timers()
+    reset_hold_timers(0)
     state = "playing"
 
 
 def start_2p(difficulty):
     # Bat dau van 2P: cua so rong gap doi, 2 board doc chung 1 SharedSequence
     # nen 2 ben nhan dung cung thu tu khoi (chinh la yeu cau cong bang).
-    global boards_2p, shared, state, paused
+    global boards_2p, shared, state, paused, difficulty_2p
     pygame.display.set_mode((settings.WIDTH_2P, settings.HEIGHT))
     pygame.display.set_caption("Tetris 2P")
+    difficulty_2p = difficulty
     shared = SharedSequence()
     boards_2p = [Board(difficulty=difficulty, shared=shared),
                  Board(difficulty=difficulty, shared=shared)]
     paused = False
-    reset_hold_timers()
+    reset_hold_timers(0)
+    reset_hold_timers(1)
     state = "playing_2p"
 
 
-def draw_board(board, origin_x, label, show_help=False):
+def draw_board(b, origin_x, label, show_help=False):
     # Ve 1 board tai vi tri origin_x + nhan ten nguoi choi goc phai panel.
-    board.draw(screen, origin_x, font, small_font)
+    b.draw(screen, origin_x, font, small_font)
     panel_x = origin_x + settings.COLS * settings.CELL
     img = small_font.render(label, True, settings.WHITE)
     screen.blit(img, (panel_x + settings.SIDEBAR - 10 - img.get_width(), 2))
@@ -90,6 +128,26 @@ def draw_board(board, origin_x, label, show_help=False):
                     (origin_x + 310, 425))
         screen.blit(small_font.render("ESC menu", True, settings.WHITE),
                     (origin_x + 310, 450))
+
+
+def draw_2p_overlay():
+    # Phu ket qua khi 1 trong 2 ben thua: lam mo ca 2 board roi hien
+    # ai thang, diem 2 ben, va nhac R de choi van moi.
+    shade = pygame.Surface((settings.WIDTH_2P, settings.HEIGHT))
+    shade.set_alpha(180)
+    shade.fill(settings.BLACK)
+    screen.blit(shade, (0, 0))
+    cx = settings.WIDTH_2P // 2
+    # boards_2p[0] thua -> P2 thang, va nguoc lai.
+    winner = "P2" if boards_2p[0].game_over else "P1"
+    t1 = font.render(winner + " THANG!", True, settings.WHITE)
+    screen.blit(t1, (cx - t1.get_width() // 2, 200))
+    s1 = small_font.render(f"P1: {boards_2p[0].score} diem", True, settings.WHITE)
+    s2 = small_font.render(f"P2: {boards_2p[1].score} diem", True, settings.WHITE)
+    screen.blit(s1, (cx - s1.get_width() // 2, 250))
+    screen.blit(s2, (cx - s2.get_width() // 2, 275))
+    r1 = small_font.render("R: choi lai  |  ESC: ve menu", True, settings.WHITE)
+    screen.blit(r1, (cx - r1.get_width() // 2, 320))
 
 
 # --- Vong lap game: lap toi khi dong cua so ---
@@ -124,15 +182,15 @@ while running:
                     pygame.display.set_mode((settings.WIDTH, settings.HEIGHT))
                     menu.reset()
                     paused = False
-                    reset_hold_timers()
+                    reset_hold_timers(0)
                     state = "menu"
                 elif event.key == pygame.K_p:
                     paused = not paused  # bat/tat pause
-                    reset_hold_timers()
+                    reset_hold_timers(0)
                 elif board.game_over and event.key == pygame.K_r:
                     board.reset()  # thua -> R de choi van moi
                     paused = False
-                    reset_hold_timers()
+                    reset_hold_timers(0)
                 elif not paused and not board.game_over:
                     # A/D KHONG xu ly o day ma o phan giu phim ben duoi,
                     # de giu phim la khoi tu di lien tuc (khoi bam nhieu lan).
@@ -141,58 +199,46 @@ while running:
                     elif event.key == pygame.K_SPACE:
                         board.hard_drop()
             elif state == "playing_2p":
-                # Ngay 5: chi la khung, 2 board roi y het nhau de kiem tra
-                # chuoi khoi chung. Phim rieng cho tung nguoi lam o Ngay 6.
+                # Ket thuc: 1 ben game over thi dung ca 2 (hien ket qua).
+                match_over = any(b.game_over for b in boards_2p)
                 if event.key == pygame.K_ESCAPE:
                     pygame.display.set_mode((settings.WIDTH, settings.HEIGHT))
                     menu.reset()
                     paused = False
-                    reset_hold_timers()
+                    reset_hold_timers(0)
+                    reset_hold_timers(1)
                     state = "menu"
-                elif event.key == pygame.K_p:
+                elif event.key == pygame.K_p and not match_over:
                     paused = not paused
+                    reset_hold_timers(0)
+                    reset_hold_timers(1)
+                elif match_over and event.key == pygame.K_r:
+                    # Rematch: van moi cung do kho, van dung chuoi chung.
+                    start_2p(difficulty_2p)
+                elif not paused and not match_over:
+                    # Xoay / roi ngay theo bo phim rieng tung nguoi choi.
+                    # A/D cua P1 (va mui ten trai/phai cua P2) xu ly o phan
+                    # giu phim ben duoi de di duoc lien tuc.
+                    for i, b in enumerate(boards_2p):
+                        ks = P2P_KEYS[i]
+                        if event.key == ks["rotate"]:
+                            b.try_rotate()
+                        elif event.key == ks["hard"]:
+                            b.hard_drop()
 
-    # 2. Giua cac frame: A/D di lien tuc, S roi nhanh (khac KEYDOWN chi ban 1 lan).
+    # 2. Giua cac frame: giu phim di lien tuc + roi nhanh (khac KEYDOWN 1 lan).
+    keys = pygame.key.get_pressed()  # trang thai giu phim tai frame nay
     if state == "playing":
-        keys = pygame.key.get_pressed()  # trang thai giu phim tai frame nay
         if not paused and not board.game_over:
-            # Giu A/D di lien tuc: frame dau di ngay 1 o, giu qua MOVE_DAS
-            # thi cu moi MOVE_INTERVAL di them 1 o. Giu ca 2 phim thi dung yen.
-            left = keys[pygame.K_a]
-            right = keys[pygame.K_d]
-            if left and not right:
-                if hold_a == 0.0:
-                    board.try_move(-1)  # moi nhan xuong thi di ngay, khong cho
-                hold_a += dt
-                hold_d = 0.0
-                repeat_d = 0.0
-                if hold_a >= settings.MOVE_DAS:
-                    repeat_a += dt
-                    while repeat_a >= settings.MOVE_INTERVAL:
-                        repeat_a -= settings.MOVE_INTERVAL
-                        board.try_move(-1)
-            elif right and not left:
-                if hold_d == 0.0:
-                    board.try_move(1)
-                hold_d += dt
-                hold_a = 0.0
-                repeat_a = 0.0
-                if hold_d >= settings.MOVE_DAS:
-                    repeat_d += dt
-                    while repeat_d >= settings.MOVE_INTERVAL:
-                        repeat_d -= settings.MOVE_INTERVAL
-                        board.try_move(1)
-            else:
-                # Tha het phim hoac giu ca 2 phim: reset dong ho, dung yen.
-                reset_hold_timers()
+            move_hold(board, keys, P2P_KEYS[0], hold_timers[0], dt)
             # Giu S thi soft_drop_held=True -> roi sieu nhanh.
-            board.update(dt, soft_drop_held=keys[pygame.K_s])
-    elif state == "playing_2p":
-        # Ca 2 board cung chay update voi cung dt -> toc do roi giong nhau,
-        # va vi doc chung chuoi khoi nen khoi dang roi cung giong nhau.
-        if not paused:
-            for b in boards_2p:
-                b.update(dt)
+            board.update(dt, soft_drop_held=keys[P2P_KEYS[0]["soft"]])
+    elif state == "playing_2p" and not paused and not any(b.game_over for b in boards_2p):
+        # Moi ben co bo phim + dong ho + soft-drop rieng, nhung cung dt
+        # nen toc do roi giong nhau.
+        for i, b in enumerate(boards_2p):
+            move_hold(b, keys, P2P_KEYS[i], hold_timers[i], dt)
+            b.update(dt, soft_drop_held=keys[P2P_KEYS[i]["soft"]])
 
     # 3. Ve theo trang thai hien tai.
     if state == "menu":
@@ -219,8 +265,11 @@ while running:
         pygame.draw.line(screen, settings.GRID_LINE, (split, 0), (split, settings.HEIGHT), 2)
         draw_board(boards_2p[0], 0, "P1")
         draw_board(boards_2p[1], split, "P2")
-        if paused:
-            screen.blit(font.render("PAUSE - P", True, settings.WHITE), (settings.WIDTH_2P // 2 - 70, 280))
+        if any(b.game_over for b in boards_2p):
+            draw_2p_overlay()  # 1 ben thua -> hien ket qua + nhac R
+        elif paused:
+            screen.blit(font.render("PAUSE - P", True, settings.WHITE),
+                        (settings.WIDTH_2P // 2 - 70, 280))
 
     pygame.display.flip()  # day khung hinh moi len man hinh
 
